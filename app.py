@@ -27,6 +27,10 @@ if "follow_up_response" not in st.session_state:
     st.session_state.follow_up_response = ""
 if "follow_up_question_input" not in st.session_state:
     st.session_state.follow_up_question_input = ""
+if "mode" not in st.session_state:
+    st.session_state.mode = "Beginner → Expert"
+if "completed_sections" not in st.session_state:
+    st.session_state.completed_sections = 0
 
 
 # CSS Styling (Refined for new layout and overall aesthetics)
@@ -275,12 +279,87 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+
+def render_sample_tree():
+    """Render an example interactive tree using ECharts."""
+    tree_data = {
+        "name": "Choose Your Tech Goal",
+        "children": [
+            {
+                "name": "AI/ML Developer",
+                "children": [
+                    {"name": "Deep Learning"},
+                    {"name": "Computer Vision"},
+                    {"name": "LLMs & LangChain"},
+                    {"name": "Capstone Project"},
+                ],
+            },
+            {
+                "name": "Full-Stack Developer",
+                "children": [
+                    {"name": "Frontend"},
+                    {"name": "Backend"},
+                    {"name": "Database"},
+                    {"name": "Deployment"},
+                ],
+            },
+            {
+                "name": "DSA & Placements",
+                "children": [
+                    {"name": "Striver A2Z Sheet"},
+                    {"name": "OS, DBMS, CN"},
+                    {"name": "Aptitude & MCQs"},
+                    {"name": "Mock Interviews"},
+                ],
+            },
+        ],
+    }
+
+    import json
+    tree_json = json.dumps(tree_data)
+
+    html_content = f"""
+    <div id='tree' style='width:100%;height:500px;'></div>
+    <script src='https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js'></script>
+    <script>
+      var chart = echarts.init(document.getElementById('tree'));
+      var option = {{
+        series: [{{
+          type: 'tree',
+          data: [{tree_json}],
+          top: '5%',
+          bottom: '5%',
+          right: '20%',
+          left: '20%',
+          symbol: 'circle',
+          expandAndCollapse: true,
+          initialTreeDepth: -1,
+          lineStyle: {{ curveness: 0.5 }}
+        }}]
+      }};
+      chart.setOption(option);
+    </script>
+    """
+    st.components.v1.html(html_content, height=500)
+
 # UI Header
 st.title("🧠 PathPilot")
 st.subheader("Your AI-Powered Learning Roadmap Buddy 🚀")
 st.markdown("Write your learning goal and get a beautifully structured roadmap with time, tools, projects, and career guidance!")
 
 user_goal = st.text_area("💬 What do you want to learn?", placeholder="e.g. I want to become a backend developer using Python", height=100)
+
+# Roadmap style toggle
+st.markdown("#### Select Roadmap Style")
+st.session_state.mode = st.radio(
+    "Choose Path Type:",
+    ["Beginner → Expert", "Job-Ready in 90 Days"],
+    index=0 if st.session_state.mode == "Beginner → Expert" else 1,
+    key="mode_radio",
+)
+
+if st.toggle("\U0001F333 Show Example Roadmap Tree", key="tree_toggle"):
+    render_sample_tree()
 
 # Check if goal has changed
 if user_goal != st.session_state.last_goal:
@@ -292,6 +371,7 @@ if user_goal != st.session_state.last_goal:
     st.session_state.follow_up_question_input = "" # Clear follow-up question input
     st.session_state.show_courses = False # Reset course toggles
     st.session_state.show_ranked_courses = False
+    st.session_state.completed_sections = 0
 
 
 # Generate roadmap button
@@ -300,8 +380,10 @@ if st.button("🎯 Generate Roadmap", use_container_width=True):
         st.warning("Please enter a valid goal.")
     else:
         with st.spinner("🛠️ Crafting your custom roadmap with Gemini..."):
-            st.session_state.roadmap = generate_roadmap(user_goal)
+            goal_with_mode = f"{user_goal} ({st.session_state.mode})"
+            st.session_state.roadmap = generate_roadmap(goal_with_mode)
             st.session_state.goal_updated = False
+            st.session_state.completed_sections = 0
             # Reset course display and ranking on new roadmap generation
             st.session_state.show_courses = False
             st.session_state.show_ranked_courses = False
@@ -381,9 +463,19 @@ if st.session_state.roadmap:
     # The regex tries to capture Level X: ... or **Career Guidance & Next Steps:**
     # It also captures the Total Estimated Time as a separate section if it's at the end
     sections_raw = re.split(r'\n{2,}(?=(?:Level|Phase|Module)\s*\d+[:\-]|\*{2}Career Guidance & Next Steps\*{2}|Total Estimated Time for Roadmap:)', roadmap_str.strip())
+
+    total_sections = sum(
+        1
+        for s in sections_raw
+        if not re.search(r"Career Guidance & Next Steps|Total Estimated Time for Roadmap:", s)
+    )
+    progress_pct = int(
+        (st.session_state.completed_sections / total_sections) * 100
+    ) if total_sections else 0
+    st.progress(progress_pct / 100, text=f"{progress_pct}% complete")
     
     # Process each section
-    for section_text in sections_raw:
+    for idx, section_text in enumerate(sections_raw):
         section_text = section_text.strip()
         if not section_text:
             continue
@@ -435,7 +527,10 @@ if st.session_state.roadmap:
                     st.markdown(f"**Mini-Projects/Exercises:** {parsed_section['Mini-Projects/Exercises']}")
                 if parsed_section["Resources/Learning Strategies"]:
                     st.markdown(f"**Resources/Learning Strategies:** {parsed_section['Resources/Learning Strategies']}")
-                
+
+                if st.button("Mark Complete ✅", key=f"complete_{idx}"):
+                    st.session_state.completed_sections += 1
+
                 st.markdown('</div>', unsafe_allow_html=True)
 
     # --- GLOBAL COURSE SUGGESTIONS BLOCK ---

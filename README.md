@@ -7,6 +7,9 @@ Key Features
 - AI-based skill roadmap generation
 - Real-time web scraping for course suggestions
 - Intelligent ranking of free & paid courses
+- Interactive tree view of tech goals
+- Progress tracking for roadmap sections
+- Toggle between "Beginner → Expert" and "Job-Ready in 90 Days" modes
 - ⚙Built using Streamlit, LangChain, Gemini API
 - Backend logic powered by Python
 
