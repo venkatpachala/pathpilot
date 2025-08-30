@@ -1,4 +1,8 @@
 streamlit
 langchain
+langchain-community
+faiss-cpu
 langchain-google-genai
 python-dotenv
+requests
+serpapi
