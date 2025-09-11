@@ -6,3 +6,5 @@ langchain-google-genai
 python-dotenv
 requests
 serpapi
+fastapi
+uvicorn
